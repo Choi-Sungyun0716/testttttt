@@ -1,0 +1,279 @@
+version: 1.0
+last_updated: 2025-11-25
+
+supervisor:
+  name: supervisor
+  description: >
+    사용자 입력 + 현재 state를 분석해 도메인/의도 판단,
+    필요 시 복합 태스크 그래프와 HITL 질문을 계획한다.
+  routing_strategy:
+    type: llm_json
+    output_contract: routing.domain, routing.intent, planned_tasks[]
+    fallback: rule_based_keyword
+  planning:
+    default_mode: hybrid   # 대략적 플랜 선행 후 스텝별 재평가
+    supports_hitl_resume: true
+    plan_fields:
+      - planned_tasks
+      - pending_user_input
+      - blocking_reason
+  domain_table:
+    schedule:
+      master: schedule_master
+      intents: [leave, meeting_room, meeting, inquiry]
+    document:
+      master: document_master
+      intents: [generate, approval, upload]
+    qa:
+      master: qa_master
+      intents: [manual, benefit, menu, recommend]
+    email:
+      master: email_master
+      intents: [search, compose, notify]
+    tech:
+      master: technology_master
+      intents: [patent, article, vectorize]
+
+masters:
+  schedule_master:
+    description: 스케줄·휴가·회의실 워크플로 전체 오케스트레이션
+    domain: schedule
+    state_read: [input, routing, schedule_domain, email_domain]
+    state_write: [schedule_domain, email_domain, output.messages]
+    default_task_graph:
+      - meeting_room_inquiry
+      - meeting_room_recommendation
+      - meeting_room_reservation_cancel
+      - schedule_register_cancel
+      - schedule_notification
+      - email_notify (via email_master 혹은 tool 직접 호출)
+    hitl_triggers:
+      - missing participants_emails
+      - conflicting_schedule_resolution
+      - approval_required_for_leave
+  document_master:
+    description: 문서 생성, 결재선 구성, 지식 업로드 조율
+    domain: document
+    state_read: [input, document_domain]
+    state_write: [document_domain, output.messages]
+    tools: [document_auto_creation, auto_approval_request, pdf_conversion, knowledge_upload_rag]
+    hitl_triggers: [missing_template_fields, approval_line_incomplete]
+  qa_master:
+    description: 사내 매뉴얼·복지·식단·추천 질의 처리
+    domain: qa
+    state_read: [input, qa_domain]
+    state_write: [qa_domain, output.messages]
+    tools: [manual_search_rag, welfare_inquiry, menu_inquiry, menu_recommendation]
+    hitl_triggers: [ambiguous_search_objective, menu_date_not_provided]
+  email_master:
+    description: 이메일 검색·초안·발송 담당
+    domain: email
+    state_read: [input, email_domain, schedule_domain]
+    state_write: [email_domain, output.messages]
+    tools: [email_search, reply_draft_generation, auto_sending, email_receipt_detection]
+    hitl_triggers: [missing_recipients, draft_confirmation_required]
+  technology_master:
+    description: 특허/논문 검색 및 벡터화 파이프라인 조율
+    domain: tech
+    state_read: [input, tech_domain]
+    state_write: [tech_domain, output.messages]
+    tools: [patent_search, patent_vectorization, paper_search, paper_vectorization]
+    hitl_triggers: [insufficient_keywords, paywalled_source_confirmation]
+
+tools:
+  schedule:
+    annual_leave_inquiry:
+      module: tool/스케줄/annual_leave_inquiry.py
+      purpose: employee leave balance/usage 조회
+      inputs:
+        required: [input.employee_id]
+        optional: [schedule_domain.leave.leave_type, schedule_domain.leave.year]
+      outputs: [schedule_domain.leave.leave_balance, messages]
+      hitl_triggers: [missing employee_id]
+    annual_leave_application:
+      module: tool/스케줄/annual_leave_application.py
+      purpose: 연차/반차 신청 생성 및 상태 업데이트
+      inputs:
+        required: [employee_id, leave_type, start_date]
+        optional: [end_date, total_days, reason]
+      outputs: [leave_request_id, leave_status]
+      follow_ups: [schedule_notification]
+    meeting_room_inquiry:
+      module: tool/스케줄/meeting_room_inquiry.py
+      purpose: 회의실 가용성 조회
+      inputs:
+        required: [start_time, end_time]
+        optional: [participants, require_video, building]
+      outputs: [meeting_room.available_rooms]
+      hitl_triggers: [missing start_time or end_time]
+    meeting_room_recommendation:
+      module: tool/스케줄/meeting_room_recommendation.py
+      purpose: 후보 회의실 점수화 및 추천 리스트 생성
+      inputs:
+        required: [available_rooms]
+        optional: [participants, require_video]
+      outputs: [meeting_room.recommended_rooms]
+      follow_ups: [meeting_room_reservation_cancel]
+    meeting_room_reservation_cancel:
+      module: tool/스케줄/meeting_room_reservation_cancel.py
+      purpose: 회의실 예약 생성 또는 취소
+      inputs:
+        required: [selected_room_id, start_time, end_time]
+        optional: [reservation_id, organizer_employee_id]
+      outputs: [reservation_id, reservation_status]
+      rollback_policy: release_slot_on_failure
+    schedule_register_cancel:
+      module: tool/스케줄/schedule_register_cancel.py
+      purpose: 사내 캘린더 일정 생성/취소
+      inputs:
+        required: [title, start_time, end_time]
+        optional: [participants, reservation_id, schedule_id]
+      outputs: [schedule_id, schedule_status]
+      hitl_triggers: [participants missing when email follow-up needed]
+    schedule_inquiry:
+      module: tool/스케줄/schedule_inquiry.py
+      purpose: 특정 직원/기간의 일정 목록 조회
+      inputs:
+        required: [employee_id]
+        optional: [date_range]
+      outputs: [schedule_domain.schedule]
+    schedule_notification:
+      module: tool/스케줄/schedule_notification.py
+      purpose: 일정/휴가 상태 알림 발송
+      inputs:
+        required: [schedule_id or leave_request_id]
+        optional: [notification_channel, message]
+      outputs: [notification_status]
+
+  document:
+    document_auto_creation:
+      module: tool/문서/document_auto_creation.py
+      purpose: 템플릿 기반 문서/보고서 자동 작성
+      inputs:
+        required: [template_name]
+        optional: [document_variables, employee_id]
+      outputs: [document_content, document_id, document_path]
+    auto_approval_request:
+      module: tool/문서/auto_approval_request.py
+      purpose: 결재선 구성 및 결재 요청 전송
+      inputs:
+        required: [document_id, approval_line]
+        optional: [approval_notes]
+      outputs: [approval_status]
+      hitl_triggers: [approval_line missing]
+    pdf_conversion:
+      module: tool/문서/pdf_conversion.py
+      purpose: 생성 문서를 PDF로 변환
+      inputs:
+        required: [document_content or document_path]
+      outputs: [pdf_path]
+    knowledge_upload_rag:
+      module: tool/문서/knowledge_upload_rag.py
+      purpose: 문서를 RAG 지식베이스(Milvus 등)에 업로드
+      inputs:
+        required: [document_path]
+        optional: [vector_db_collection]
+      outputs: [upload_status, vector_db_collection]
+
+  qa:
+    manual_search_rag:
+      module: tool/Q&A/manual_search_rag.py
+      purpose: 매뉴얼/사내 문서 RAG 검색
+      inputs:
+        required: [search_query]
+        optional: [search_type]
+      outputs: [rag_results]
+    welfare_inquiry:
+      module: tool/Q&A/welfare_inquiry.py
+      purpose: 복리후생 정보 조회
+      inputs:
+        required: [benefit_category]
+        optional: [employee_id]
+      outputs: [qa_domain.benefit_info]
+    menu_inquiry:
+      module: tool/Q&A/menu_inquiry.py
+      purpose: 식단 정보 조회
+      inputs:
+        required: [menu_date]
+        optional: [menu_corner]
+      outputs: [qa_domain.menu]
+      hitl_triggers: [menu_date missing]
+    menu_recommendation:
+      module: tool/Q&A/menu_recommendation.py
+      purpose: 개인화 식단 추천
+      inputs:
+        required: [preference_profile or search_query]
+        optional: [calorie_goal]
+      outputs: [qa_domain.menu_recommendation]
+
+  email:
+    email_search:
+      module: tool/이메일/email_search.py
+      purpose: 메일함 검색 및 결과 요약
+      inputs:
+        required: [search_query]
+        optional: [date_range, sender]
+      outputs: [email_search_results]
+    reply_draft_generation:
+      module: tool/이메일/reply_draft_generation.py
+      purpose: 수신 메일 기반 답장 초안 작성
+      inputs:
+        required: [email_context]
+      outputs: [email_draft, email_subject]
+    auto_sending:
+      module: tool/이메일/auto_sending.py
+      purpose: 최종 이메일 자동 발송
+      inputs:
+        required: [email_draft, email_to]
+        optional: [email_cc, attachments]
+      outputs: [email_sent]
+      hitl_triggers: [email_to missing or unverified]
+    email_receipt_detection:
+      module: tool/이메일/email_receipt_detection.py
+      purpose: 발송 메일 수신 여부 확인
+      inputs:
+        required: [email_id]
+      outputs: [email_receipt_status]
+
+  tech:
+    patent_search:
+      module: tool/기술/patent_search.py
+      purpose: 특허 검색 API/RAG 호출
+      inputs:
+        required: [search_keywords]
+      outputs: [search_results]
+    patent_vectorization:
+      module: tool/기술/patent_vectorization.py
+      purpose: 선택 특허 전문 임베딩 및 Milvus 적재
+      inputs:
+        required: [selected_patent_id]
+      outputs: [vectorization_status, vector_db_collection]
+    paper_search:
+      module: tool/기술/paper_search.py
+      purpose: 논문/기사 검색
+      inputs:
+        required: [search_keywords]
+      outputs: [search_results]
+    paper_vectorization:
+      module: tool/기술/paper_vectorization.py
+      purpose: 선택 논문 임베딩 및 저장
+      inputs:
+        required: [selected_article_id]
+      outputs: [vectorization_status]
+
+hitl_policies:
+  default_resume_strategy: resume_pending_task
+  storage_fields: [pending_user_input, pending_task_id, blocking_reason]
+  rules:
+    - name: missing_participants
+      condition: schedule_domain.meeting_room.participants null
+      question: "회의 참석자로 포함할 직원을 알려주세요."
+    - name: missing_email_recipients
+      condition: email_domain.email_to empty
+      question: "초대 메일을 보낼 이메일 주소를 입력해주세요."
+    - name: missing_approval_line
+      condition: document_domain.approval_line empty
+      question: "결재선에 포함할 직원을 순서대로 적어주세요."
+    - name: insufficient_search_keywords
+      condition: tech_domain.search_keywords length < 1
+      question: "찾고 싶은 특허/논문 키워드를 한두 개 이상 입력해주세요."

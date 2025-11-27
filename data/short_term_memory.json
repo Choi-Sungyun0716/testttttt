@@ -1,0 +1,256 @@
+{
+  "conversations": [
+    {
+      "timestamp": "2025-11-27T04:16:22.370038+00:00",
+      "session_id": "sess_dev",
+      "user_query": "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘",
+      "intent": "compose",
+      "tools": [
+        {
+          "name": "auto_sending",
+          "inputs": {
+            "email_domain.email_draft": null,
+            "email_domain.email_to": null
+          },
+          "outputs": {
+            "email_domain.email_sent": null
+          }
+        }
+      ],
+      "hitl_required": true,
+      "hitl_reason": "Missing information about the meeting details and room reservation."
+    },
+    {
+      "timestamp": "2025-11-27T04:16:30.024096+00:00",
+      "session_id": "sess_dev",
+      "user_query": "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘",
+      "intent": "meeting",
+      "tools": [
+        {
+          "name": "meeting_room_inquiry",
+          "inputs": {
+            "schedule_domain.meeting_room.start_time": null,
+            "schedule_domain.meeting_room.end_time": null,
+            "schedule_domain.meeting_room.participants": null,
+            "schedule_domain.meeting_room.require_video": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.available_rooms": null
+          }
+        },
+        {
+          "name": "meeting_room_recommendation",
+          "inputs": {
+            "schedule_domain.meeting_room.available_rooms": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.recommended_rooms": null
+          }
+        },
+        {
+          "name": "meeting_room_reservation_cancel",
+          "inputs": {
+            "schedule_domain.meeting_room.selected_room_id": null,
+            "schedule_domain.meeting_room.start_time": null,
+            "schedule_domain.meeting_room.end_time": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.reservation_id": null,
+            "schedule_domain.meeting_room.reservation_status": null
+          }
+        }
+      ],
+      "hitl_required": true,
+      "hitl_reason": "Missing participants information for the meeting inquiry."
+    },
+    {
+      "timestamp": "2025-11-27T04:23:47.118068+00:00",
+      "session_id": "sess_dev",
+      "user_query": "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘",
+      "intent": "compose",
+      "tools": [
+        {
+          "name": "auto_sending",
+          "inputs": {
+            "email_domain.email_draft": null,
+            "email_domain.email_to": null
+          },
+          "outputs": {
+            "email_domain.email_sent": null
+          }
+        }
+      ],
+      "hitl_required": true,
+      "hitl_reason": "회의실 예약 정보가 필요합니다."
+    },
+    {
+      "timestamp": "2025-11-27T04:24:07.062051+00:00",
+      "session_id": "sess_dev",
+      "user_query": "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘",
+      "intent": "meeting",
+      "tools": [
+        {
+          "name": "meeting_room_inquiry",
+          "inputs": {
+            "schedule_domain.meeting_room.start_time": null,
+            "schedule_domain.meeting_room.end_time": null,
+            "schedule_domain.meeting_room.participants": null,
+            "schedule_domain.meeting_room.require_video": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.available_rooms": null
+          }
+        },
+        {
+          "name": "meeting_room_recommendation",
+          "inputs": {
+            "schedule_domain.meeting_room.available_rooms": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.recommended_rooms": null
+          }
+        },
+        {
+          "name": "meeting_room_reservation_cancel",
+          "inputs": {
+            "schedule_domain.meeting_room.selected_room_id": null,
+            "schedule_domain.meeting_room.start_time": null,
+            "schedule_domain.meeting_room.end_time": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.reservation_id": null,
+            "schedule_domain.meeting_room.reservation_status": null
+          }
+        }
+      ],
+      "hitl_required": true,
+      "hitl_reason": "Missing start_time and end_time for the meeting room inquiry."
+    },
+    {
+      "timestamp": "2025-11-27T04:27:15.569128+00:00",
+      "session_id": "sess_dev",
+      "user_query": "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘",
+      "intent": "compose",
+      "tools": [
+        {
+          "name": "auto_sending",
+          "inputs": {
+            "email_domain.email_draft": null,
+            "email_domain.email_to": null
+          },
+          "outputs": {
+            "email_domain.email_sent": null
+          }
+        }
+      ],
+      "hitl_required": true,
+      "hitl_reason": "회의실 예약을 위한 정보가 필요합니다."
+    },
+    {
+      "timestamp": "2025-11-27T04:27:30.456640+00:00",
+      "session_id": "sess_dev",
+      "user_query": "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘",
+      "intent": "meeting",
+      "tools": [
+        {
+          "name": "meeting_room_inquiry",
+          "inputs": {
+            "schedule_domain.meeting_room.start_time": null,
+            "schedule_domain.meeting_room.end_time": null,
+            "schedule_domain.meeting_room.participants": null,
+            "schedule_domain.meeting_room.require_video": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.available_rooms": null
+          }
+        },
+        {
+          "name": "meeting_room_recommendation",
+          "inputs": {
+            "schedule_domain.meeting_room.available_rooms": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.recommended_rooms": null
+          }
+        },
+        {
+          "name": "meeting_room_reservation_cancel",
+          "inputs": {
+            "schedule_domain.meeting_room.selected_room_id": null,
+            "schedule_domain.meeting_room.start_time": null,
+            "schedule_domain.meeting_room.end_time": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.reservation_id": null,
+            "schedule_domain.meeting_room.reservation_status": null
+          }
+        }
+      ],
+      "hitl_required": true,
+      "hitl_reason": "Missing start_time and end_time for the meeting room inquiry."
+    },
+    {
+      "timestamp": "2025-11-27T04:37:09.649987+00:00",
+      "session_id": "sess_dev",
+      "user_query": "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘",
+      "intent": "compose",
+      "tools": [
+        {
+          "name": "auto_sending",
+          "inputs": {
+            "email_domain.email_draft": null,
+            "email_domain.email_to": null
+          },
+          "outputs": {
+            "email_domain.email_sent": null
+          }
+        }
+      ],
+      "hitl_required": true,
+      "hitl_reason": "회의실 예약 정보가 필요합니다."
+    },
+    {
+      "timestamp": "2025-11-27T04:37:20.792270+00:00",
+      "session_id": "sess_dev",
+      "user_query": "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘",
+      "intent": "meeting",
+      "tools": [
+        {
+          "name": "meeting_room_inquiry",
+          "inputs": {
+            "schedule_domain.meeting_room.start_time": null,
+            "schedule_domain.meeting_room.end_time": null,
+            "schedule_domain.meeting_room.participants": null,
+            "schedule_domain.meeting_room.require_video": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.available_rooms": null
+          }
+        },
+        {
+          "name": "meeting_room_recommendation",
+          "inputs": {
+            "schedule_domain.meeting_room.available_rooms": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.recommended_rooms": null
+          }
+        },
+        {
+          "name": "meeting_room_reservation_cancel",
+          "inputs": {
+            "schedule_domain.meeting_room.selected_room_id": null,
+            "schedule_domain.meeting_room.start_time": null,
+            "schedule_domain.meeting_room.end_time": null
+          },
+          "outputs": {
+            "schedule_domain.meeting_room.reservation_id": null,
+            "schedule_domain.meeting_room.reservation_status": null
+          }
+        }
+      ],
+      "hitl_required": true,
+      "hitl_reason": "Missing participants information for the meeting inquiry."
+    }
+  ]
+}
