@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from .catalog import MASTER_SPECS, TOOL_SPECS, MasterSpec, ToolSpec
 
@@ -26,6 +26,10 @@ class ToolPlan(BaseModel):
     fallback: Optional[str] = Field(
         default=None,
         description="Optional fallback recommendation if the tool fails",
+    )
+    extracted_inputs: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Automatically extracted input values for this tool",
     )
     extracted_inputs: Dict[str, Any] = Field(
         default_factory=dict,
@@ -151,6 +155,89 @@ class BaseLLMMaster:
                 f"  Outputs: {', '.join(spec.outputs) or 'n/a'}"
             )
         return "\n".join(lines) if lines else "No tools registered."
+
+    def _extract_tool_inputs(self, query: str, decision: MasterDecision) -> None:
+        """Use LLM structured output parser to infer required inputs."""
+
+        for plan in decision.plan:
+            spec = self.tool_specs.get(plan.tool)
+            required_fields: List[str] = []
+            if spec and spec.inputs:
+                required_fields.extend(spec.inputs)
+            if plan.inputs_to_collect:
+                required_fields.extend(plan.inputs_to_collect)
+
+            unique_fields: List[str] = []
+            for field in required_fields:
+                if field and field not in unique_fields:
+                    unique_fields.append(field)
+
+            if not unique_fields:
+                plan.extracted_inputs = {}
+                continue
+
+            sanitized_map = {
+                self._sanitize_field_name(field): field for field in unique_fields
+            }
+            DynamicModel = create_model(
+                "ToolInputExtraction",
+                **{
+                    sanitized: (
+                        Optional[str],
+                        Field(
+                            default=None,
+                            description=f"Value extracted for '{original}'",
+                        ),
+                    )
+                    for sanitized, original in sanitized_map.items()
+                },
+            )
+            parser = JsonOutputParser(pydantic_object=DynamicModel)
+
+            extraction_prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        "Extract values for each requested field from the user query. "
+                        "Return JSON that matches the provided schema. "
+                        "Use text snippets directly from the query; if unknown, set null.",
+                    ),
+                    (
+                        "user",
+                        "User query: {query}\n"
+                        "Tool: {tool}\n"
+                        "Action: {action}\n"
+                        "Fields: {fields}\n"
+                        "{format_instructions}",
+                    ),
+                ]
+            )
+
+            chain = extraction_prompt | self.llm | parser
+            try:
+                parsed = chain.invoke(
+                    {
+                        "query": query,
+                        "tool": plan.tool,
+                        "action": plan.action,
+                        "fields": ", ".join(unique_fields),
+                        "format_instructions": parser.get_format_instructions(),
+                    }
+                )
+                values = {}
+                parsed_dict = parsed.dict() if hasattr(parsed, "dict") else parsed
+                for sanitized, original in sanitized_map.items():
+                    values[original] = parsed_dict.get(sanitized)
+                plan.extracted_inputs = values
+            except Exception:
+                plan.extracted_inputs = {field: None for field in unique_fields}
+
+    @staticmethod
+    def _sanitize_field_name(field_name: str) -> str:
+        sanitized = field_name.replace(".", "__").replace("-", "_")
+        if sanitized and sanitized[0].isdigit():
+            sanitized = f"value_{sanitized}"
+        return sanitized or "value"
 
     def _extract_tool_inputs(self, query: str, decision: MasterDecision) -> None:
         """Use the LLM to infer tool inputs directly from the user query."""

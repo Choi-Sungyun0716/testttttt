@@ -23,7 +23,7 @@ logging.basicConfig(
 load_dotenv()
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-query = "asdf1234@naver.com 한테 내일 오후 3시 미팅 어떠냐고 메일로 물어봐주고고 회의실도 좀 잡아줘"
+query = "김철수한테 내일 3시 미팅 어떠냐고 물어봐주고 4명이서 쓸 회의실도 좀 잡아줘"
 
 # 1) Supervisor가 전체 시나리오 작성
 supervisor = SupervisorRouter(llm=llm)
@@ -44,10 +44,12 @@ for task in plan.master_tasks:
     if not master_cls:
         logging.warning("Unknown master '%s' skipped.", task.master)
         continue
+    task_query = getattr(task, "sub_query", "") or query
+    logging.info("Dispatching to %s with query: %s", task.master, task_query)
 
     master = master_cls(llm=llm)
     decision = master.plan_tools(
-        query=query,
+        query=task_query,
         state={},
         task_context=task.model_dump(),
         intent=task.intent,
